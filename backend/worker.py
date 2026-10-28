@@ -17,7 +17,9 @@ try:
     scope = {}
     with contextlib.redirect_stdout(CappedOutput()), contextlib.redirect_stderr(CappedOutput()):
         exec(compile(payload['code'], '<solution>', 'exec'), scope)
-        result = scope['solve'](*payload['args'])
+        result = scope[payload['function_name']](*payload['args'])
+        if payload['result_mode'] == 'mutated_first_arg':
+            result = payload['args'][0]
     output = json.dumps({'actual': result}, allow_nan=False)
     if len(output) > 65536:
         raise ValueError('Result too large')

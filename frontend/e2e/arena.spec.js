@@ -1,9 +1,9 @@
 import {test,expect} from '@playwright/test';
-const solution='def solve(nums, target):\n    for i, x in enumerate(nums):\n        for j in range(i + 1, len(nums)):\n            if x + nums[j] == target:\n                return [i, j]';
+const solution='def move_zeroes(nums):\n    write = 0\n    for read in range(len(nums)):\n        if nums[read] != 0:\n            nums[write], nums[read] = nums[read], nums[write]\n            write += 1';
 async function edit(page,code){const editor=page.locator('.cm-content');await editor.click();await page.keyboard.press('ControlOrMeta+A');await page.keyboard.insertText(code);}
 test('solve workflow, drafts, progress, failures and navigation',async({page})=>{
  await page.goto('/');
- await expect(page.getByRole('heading',{name:'Two Sum',exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Move Zeroes',exact:true})).toBeVisible();
  await edit(page,solution);
  await page.getByRole('button',{name:'Run examples'}).click();
  await expect(page.getByText('Examples passed — ready to submit?')).toBeVisible();
@@ -12,20 +12,21 @@ test('solve workflow, drafts, progress, failures and navigation',async({page})=>
  await expect(page.getByText('Accepted — well played!')).toBeVisible();
  await expect(page.getByText('1 submissions')).toBeVisible();
  await page.reload();
- await expect(page.locator('.cm-content')).toContainText('return [i, j]');
+ await expect(page.locator('.cm-content')).toContainText('write += 1');
  await expect(page.getByText('1 submissions')).toBeVisible();
- await edit(page,'def solve(nums, target):\n    return []');
+ await edit(page,'def move_zeroes(nums):\n    return []');
  await page.getByRole('button',{name:'Submit solution'}).click();
  await expect(page.getByText('Keep going — some cases failed')).toBeVisible();
  await expect(page.getByText('2 submissions')).toBeVisible();
- await expect(page.locator('.score strong')).toHaveText('1 / 6');
- await page.getByRole('button',{name:/Valid Palindrome/}).click();
- await expect(page.locator('.cm-content')).toContainText('def solve(text)');
- await page.getByRole('button',{name:/Two Sum/}).click();
+ await expect(page.locator('.score strong')).toHaveText('1 / 3');
+ await page.getByRole('button',{name:/First Non-Repeating Character/}).click();
+ await expect(page.getByRole('timer')).toHaveText('25:00');
+ await expect(page.locator('.cm-content')).toContainText('def first_unique_char(s: str)');
+ await page.getByRole('button',{name:/Move Zeroes/}).click();
  await expect(page.locator('.cm-content')).toContainText('return []');
- await page.getByRole('textbox',{name:'Search problems'}).fill('Trees');
- await expect(page.getByRole('button',{name:/Maximum Tree Depth/})).toBeVisible();
- await expect(page.getByRole('button',{name:/Two Sum/})).toHaveCount(0);
+ await page.getByRole('textbox',{name:'Search problems'}).fill('Hash maps');
+ await expect(page.getByRole('button',{name:/First Duplicate Within K Positions/})).toBeVisible();
+ await expect(page.getByRole('button',{name:/Move Zeroes/})).toHaveCount(0);
 });
 test('timer pauses, resets and expires using wall time',async({page})=>{
  await page.clock.install();await page.goto('/');
@@ -46,6 +47,6 @@ test('timer pauses, resets and expires using wall time',async({page})=>{
 });
 test('mobile layout fits viewport',async({page})=>{
  await page.setViewportSize({width:390,height:844});await page.goto('/');
- await expect(page.getByRole('heading',{name:'Two Sum',exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Move Zeroes',exact:true})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
 });

@@ -4,10 +4,10 @@ A Python interview practice MVP with a React + CodeMirror editor and FastAPI run
 
 ## Features
 
-- Six challenges: Two Sum, Valid Palindrome, Maximum Subarray, Balanced Brackets, Binary Search, and Maximum Tree Depth.
+- Your Daily Python DSA Practice questions: Move Zeroes (in-place practice), Day 2: First Duplicate Within K Positions, and Day 3: First Non-Repeating Character. Original function names, day labels, constraints, examples, and reflection prompts are included.
 - Python syntax highlighting, autocomplete, line numbers, indentation, saved drafts, and reset to starter code.
-- **Run examples** checks two visible cases; **Submit solution** runs the full suite, including hidden edge cases. Results show pass/fail, execution time, visible input/output, and errors.
-- 15/30/45/60-minute countdown with start, pause, reset, and expiry notice. Uses elapsed wall time so background tabs do not slow the countdown. Expiry allows continued practice; timer state resets on page reload.
+- **Run examples** checks the visible examples for that question; **Submit solution** runs the full suite, including hidden edge cases. Results show pass/fail, execution time, visible input/output, and errors.
+- 15/25/30/45/60-minute countdown with start, pause, reset, and expiry notice. Uses elapsed wall time so background tabs do not slow the countdown. Expiry allows continued practice; timer state resets on page reload.
 - Browser-local progress dashboard, submission count, permanent solved status, and drafts. No account required. Clearing browser storage removes this data; no server-side progress or cross-device sync in this MVP.
 - Responsive layout, keyboard-accessible controls, and live execution feedback.
 
@@ -36,7 +36,7 @@ Open **http://127.0.0.1:5173**. Vite proxies `/api` requests to port 8000; start
 
 ## Practice workflow
 
-1. Choose a problem and implement the provided `solve` function. Inputs are JSON values, passed as positional arguments; return a JSON-serializable value instead of reading stdin or printing an answer.
+1. Choose a problem and implement the provided named function (`move_zeroes`, `nearby_duplicate`, or `first_unique_char`). Inputs are JSON values, passed as positional arguments; return a JSON-serializable value instead of reading stdin or printing an answer. For Move Zeroes, mutate the original list; the runner checks that list and ignores the return value.
 2. Run examples for quick feedback. Submit for full evaluation; only submissions update progress. Hidden case details are omitted from API results.
 3. Start an optional interview timer. Drafts save as you type. A later failed submission never removes an earlier solve.
 
@@ -70,4 +70,8 @@ For public hosting, replace the worker with a hardened execution service using p
 - `backend/problems.py`: problem statements, starters, public and hidden cases
 - `backend/tests`, `frontend/src/*.test.js`, `frontend/e2e`: automated checks
 
-Add a challenge in `backend/problems.py` with a unique ID, a starter signature, and at least two examples followed by hidden cases. Add a reference solution to the backend test fixtures.
+Add a challenge in `backend/problems.py` with a unique ID, function name, starter signature, example count, guidance, and cases (visible examples first, followed by hidden cases). Add a reference solution to the backend test fixtures.
+
+## Curriculum source
+
+This catalog follows the **Daily Python DSA Practice** chat. Day 2 and Day 3 retain the retrieved statements, examples, constraints, 25-minute recommendations, and self-review prompts. Move Zeroes was reconstructed from the shared attempt and in-place follow-up; its extra examples and 30-minute default are Arena additions, not a verbatim recovered assignment. Added hidden cases cover empty input, duplicates, negative numbers, and boundary behavior. Approach restrictions and complexity targets are learning requirements; output tests do not prove them. No other earlier in-place follow-up questions were available in the readable chat history, so none have been invented.

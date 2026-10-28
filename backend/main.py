@@ -23,10 +23,10 @@ def health():
 
 @app.get('/api/problems')
 def problems():
-    return [{**{k:v for k,v in p.items() if k != 'cases'}, 'examples': p['cases'][:2],
+    return [{**{k:v for k,v in p.items() if k != 'cases'}, 'examples': p['cases'][:p['example_count']],
              'test_count': len(p['cases'])} for p in PROBLEMS]
 
-async def evaluate(code, case):
+async def evaluate(code, case, function_name, result_mode):
     started = time.monotonic()
     with tempfile.TemporaryDirectory(prefix='dsa-') as directory:
         process = await asyncio.create_subprocess_exec(sys.executable, '-I', WORKER,
@@ -34,7 +34,7 @@ async def evaluate(code, case):
             stderr=asyncio.subprocess.DEVNULL, cwd=directory, start_new_session=True,
             env={'PATH': '/usr/bin:/bin'})
         try:
-            output, _ = await asyncio.wait_for(process.communicate(json.dumps({'code':code, 'args':case['args']}).encode()), timeout=3)
+            output, _ = await asyncio.wait_for(process.communicate(json.dumps({'code':code, 'args':case['args'], 'function_name':function_name, 'result_mode':result_mode}).encode()), timeout=3)
             result = json.loads(output) if process.returncode == 0 else {'error':'Worker exited (resource limit or process error)'}
         except asyncio.TimeoutError:
             result = {'error':'Time limit exceeded (3 seconds)'}
@@ -57,13 +57,13 @@ async def submit(body: Submission):
     if body.mode not in ('run', 'submit'):
         raise HTTPException(422, 'mode must be run or submit')
     problem = BY_ID[body.problem_id]
-    cases = problem['cases'] if body.mode == 'submit' else problem['cases'][:2]
+    cases = problem['cases'] if body.mode == 'submit' else problem['cases'][:problem['example_count']]
     async with slots:
         results = []
         for i, case in enumerate(cases):
-            result = await evaluate(body.code, case)
+            result = await evaluate(body.code, case, problem['function_name'], problem['result_mode'])
             result['case'] = i+1
-            if i < 2:
+            if i < problem['example_count']:
                 result.update(args=case['args'], expected=case['expected'])
             else:
                 result.pop('actual', None)

@@ -2,11 +2,8 @@ import pytest
 from fastapi.testclient import TestClient
 from backend.main import app
 
-SOLUTIONS = {
- 'move-zeroes': 'def move_zeroes(nums):\n write=0\n for read in range(len(nums)):\n  if nums[read]!=0:\n   nums[write],nums[read]=nums[read],nums[write]\n   write+=1',
- 'nearby-duplicate': 'def nearby_duplicate(nums,k):\n seen={}\n for i,x in enumerate(nums):\n  if x in seen and i-seen[x]<=k: return True\n  seen[x]=i\n return False',
- 'first-unique-char': 'def first_unique_char(s):\n counts={}\n for c in s: counts[c]=counts.get(c,0)+1\n for i,c in enumerate(s):\n  if counts[c]==1: return i\n return -1'
-}
+from backend.tests.solutions import SOLUTIONS
+from backend.problems import PROBLEMS, CHAPTERS
 
 @pytest.fixture
 def client():
@@ -19,7 +16,7 @@ def send(client, code, problem='move-zeroes', mode='submit'):
 def test_catalog_and_health(client):
     assert client.get('/api/health').json()=={'status':'ok'}
     data=client.get('/api/problems').json()
-    assert len(data)==3
+    assert len(data)==30
     assert all('cases' not in p and len(p['examples'])==p['example_count'] for p in data)
 
 @pytest.mark.parametrize('problem', SOLUTIONS)
@@ -69,8 +66,22 @@ def test_original_attempt_fails_mutation_check(client):
 
 def test_original_examples_are_visible(client):
     data=client.get('/api/problems').json()
-    assert data[1]['examples'][0]=={'args':[[4,2,7,4,9],3],'expected':True}
-    assert data[2]['examples'][2]=={'args':['aabbcc'],'expected':-1}
+    assert next(p for p in data if p['id']=='nearby-duplicate')['examples'][0]=={'args':[[4,2,7,4,9],3],'expected':True}
+    assert next(p for p in data if p['id']=='first-unique-char')['examples'][2]=={'args':['aabbcc'],'expected':-1}
     for id in ['nearby-duplicate','first-unique-char']:
         result=send(client,SOLUTIONS[id],problem=id,mode='run').json()
         assert result['accepted'] and len(result['results'])==3
+
+
+def test_curriculum_has_ten_questions_and_five_retry_pairs_per_chapter(client):
+    assert client.get('/api/chapters').json()==CHAPTERS
+    assert len({p['id'] for p in PROBLEMS})==30
+    assert set(SOLUTIONS)=={p['id'] for p in PROBLEMS}
+    for chapter in CHAPTERS:
+        questions=[p for p in PROBLEMS if p['chapter_id']==chapter['id']]
+        assert len(questions)==10 and len(chapter['concepts'])==5
+        for concept in chapter['concepts']:
+            pair=[p for p in questions if p['concept_id']==concept['id']]
+            assert len(pair)==2
+            assert pair[0]['minutes']==pair[1]['minutes']
+            assert all(20<=p['minutes']<=45 and len(p['hints'])==3 for p in pair)

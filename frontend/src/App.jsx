@@ -1,45 +1,79 @@
 import React, {useEffect, useRef, useState} from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import {python} from '@codemirror/lang-python';
-import {read, write, remaining, record} from './storage';
+import {read,write,remaining} from './storage';
+import {restoreCourse,transition,canRun} from './course';
+import ChapterLesson from './ChapterLesson';
+import ProgressDashboard from './ProgressDashboard';
 import './style.css';
-import TopicGuide from './TopicGuide';
-import {canExecute} from './storage';
+const COURSE_KEY='arena.course.v1';
 
-export default function App() {
-  const [problems,setProblems]=useState([]), [selected,setSelected]=useState('move-zeroes');
-  const [drafts,setDrafts]=useState(()=>read('arena.drafts',{}));
-  const [progress,setProgress]=useState(()=>read('arena.progress',{}));
-  const [filter,setFilter]=useState(''), [error,setError]=useState(''), [busy,setBusy]=useState(false), [result,setResult]=useState(null);
-  const [minutes,setMinutes]=useState(30), [deadline,setDeadline]=useState(null), [seconds,setSeconds]=useState(1800);
-  const [saveError,setSaveError]=useState(false);
-  const locked=useRef(false);
-  const p=problems.find(p=>p.id===selected);
-  useEffect(()=>{fetch('/api/problems').then(r=>{if(!r.ok) throw Error('Unable to load problems');return r.json()}).then(setProblems).catch(e=>setError(e.message+'. Check that the API is running.'));},[]);
-  useEffect(()=>{setSaveError(!write('arena.drafts',drafts) || !write('arena.progress',progress));},[drafts,progress]);
-  useEffect(()=>{if(!deadline)return; const tick=()=>{const left=remaining(deadline);setSeconds(left);if(left===0)setDeadline(null);}; tick(); const id=setInterval(tick,250);return()=>clearInterval(id);},[deadline]);
-  function choose(id){setSelected(id);setResult(null);setError('');if(!deadline){const duration=problems.find(item=>item.id===id)?.minutes||30;setMinutes(duration);setSeconds(duration*60);}}
-  async function run(mode){
-    if(locked.current || !p || !canExecute(deadline))return;
-    locked.current=true;setBusy(true);setError('');setResult(null);
-    try {const response=await fetch('/api/submissions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({problem_id:p.id,code:drafts[p.id]??p.starter,mode})});
-      if(!response.ok)throw Error('Execution failed. Please retry.');
-      const data=await response.json();setResult(data);
-      if(mode==='submit')setProgress(prev=>record(prev,p.id,data.accepted));
-    } catch(e){setError(e.message);}finally{setBusy(false);locked.current=false;}
+export default function App(){
+ const [problems,setProblems]=useState([]),[chapters,setChapters]=useState([]),[course,setCourse]=useState(null);
+ const [drafts,setDrafts]=useState(()=>read('arena.drafts',{}));
+ const [result,setResult]=useState(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[saveError,setSaveError]=useState(false),[now,setNow]=useState(Date.now());
+ const current=useRef(null),request=useRef(null);
+ function persist(next){current.current=next;setCourse(next);if(!write(COURSE_KEY,next))setSaveError(true);}
+ function send(action){if(current.current)persist(transition(current.current,action,chapters,problems));}
+ useEffect(()=>{const controller=new AbortController();
+  async function load(){try{
+   const responses=await Promise.all(['/api/problems','/api/chapters'].map(url=>fetch(url,{signal:controller.signal})));
+   if(responses.some(r=>!r.ok))throw Error('Unable to load your chapters.');
+   const [ps,cs]=await Promise.all(responses.map(r=>r.json()));
+   setProblems(ps);setChapters(cs);
+   let restored=restoreCourse(read(COURSE_KEY,{}),cs,ps);
+   restored=transition(restored,{type:'expire',now:Date.now()},cs,ps);
+   persist(restored);setNow(Date.now());
+  }catch(e){if(e.name!=='AbortError')setError(`${e.message} Check that the API is running and reload.`);}}
+  load();return()=>controller.abort();
+ },[]);
+ useEffect(()=>{if(!write('arena.drafts',drafts))setSaveError(true);},[drafts]);
+ useEffect(()=>{
+  if(course?.status!=='running')return;
+  const tick=()=>{setNow(Date.now());if(current.current?.status==='running'&&current.current.deadline<=Date.now())send({type:'expire'});};
+  tick();const timer=setInterval(tick,250);return()=>clearInterval(timer);
+ },[course?.status,course?.deadline,chapters,problems]);
+ useEffect(()=>{request.current?.controller.abort();request.current=null;setBusy(false);setResult(null);setError('');},[course?.activeId]);
+ useEffect(()=>()=>request.current?.controller.abort(),[]);
+ const p=problems.find(p=>p.id===course?.activeId),chapter=chapters[course?.chapterIndex];
+ async function run(mode){
+  if(!p||request.current||!canRun(current.current)){send({type:'expire'});return;}
+  const token={controller:new AbortController(),id:p.id,deadline:current.current.deadline};
+  request.current=token;setBusy(true);setError('');setResult(null);
+  try{
+   const response=await fetch('/api/submissions',{method:'POST',signal:token.controller.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({problem_id:p.id,code:drafts[p.id]??p.starter,mode})});
+   if(!response.ok)throw Error('Execution failed. Try again while your timer is running.');
+   const data=await response.json();
+   if(current.current.activeId!==token.id||current.current.deadline!==token.deadline)return;
+   if(!canRun(current.current)){send({type:'expire'});return;}
+   setResult(data);
+   if(mode==='submit')send({type:'submit',problemId:token.id,accepted:data.accepted});
+  }catch(e){if(e.name!=='AbortError')setError(e.message);}finally{
+   if(request.current===token){request.current=null;setBusy(false);}
   }
-  const timerRunning=canExecute(deadline);
-  const solved=problems.filter(p=>progress[p.id]?.solved).length;
-  return <><header><a className="brand" href="/">◈ <span>DSA<span className="accent">Arena</span></span></a><span className="tag">DAILY PYTHON DSA PRACTICE</span><span className="local">● Local workspace</span></header>
-    <main><section className="intro"><div><span className="eyebrow">THE DAILY REP</span><h1>Think clearly. Code confidently.</h1><p>One problem at a time. Build your interview instinct.</p></div><div className="score"><strong>{solved}<small> / {problems.length}</small></strong><span>problems solved</span><progress value={solved} max={problems.length||1}/></div></section>
-    {saveError&&<div role="alert">Browser storage is unavailable. Drafts and progress may be lost on reload.</div>}
-    {error&&<div className="error" role="alert">{error}</div>}
-    <div className="workspace"><aside><div className="section-label">PROBLEM LIBRARY <span>{problems.length}</span></div><input aria-label="Search problems" placeholder="Search problems or topics…" value={filter} onChange={e=>setFilter(e.target.value)}/><nav>{problems.filter(p=>(p.title+p.topic).toLowerCase().includes(filter.toLowerCase())).map((item,i)=><button disabled={busy} key={item.id} className={'problem '+(selected===item.id?'active':'')} onClick={()=>choose(item.id)}><span className="number">{progress[item.id]?.solved?'✓':String(i+1).padStart(2,'0')}</span><span><strong>{item.title}</strong><small>{item.topic} · {item.difficulty}</small></span></button>)}</nav><div className="aside-note">Small steps, real progress.<p>Your drafts and submissions stay in this browser.</p></div></aside>
-    <article>{p ? <><div className="problem-head"><span className="pill">{p.difficulty}</span><TopicGuide problem={p}/><span className="attempts">{progress[p.id]?.attempts||0} submissions</span></div><h2>{p.title}</h2><p className="description">{p.description}</p><h3>Constraints & approach</h3><ul className="guidance">{p.constraints.map(text=><li key={text}>{text}</li>)}</ul><h3>Examples</h3><div className="examples">{p.examples.map((c,i)=><div key={i}><small>EXAMPLE {i+1}</small><pre>Input: {JSON.stringify(c.args)}{'\n'}Output: {JSON.stringify(c.expected)}</pre></div>)}</div><div className="contract"><strong>Your task</strong><p>Implement <code>{p.function_name}</code>. {p.result_mode==='mutated_first_arg'?'Arena checks the original list after your function runs; returning a new list alone will fail.':'Arguments are passed in the order shown above; return your answer.'} {p.test_count} test cases check your submission.</p><strong>Before submitting, explain</strong><ul>{p.prompts.map(text=><li key={text}>{text}</li>)}</ul><p>These are self-review prompts. Automated tests check behavior; they do not prove complexity or enforce the approach restrictions.</p></div></>:<p>{error?'Start the backend and reload to connect.':'Loading your next challenge…'}</p>}</article>
-    <section className="coding"><div className="timer"><div><small>INTERVIEW TIMER</small><strong role="timer" aria-label="Time remaining">{String(Math.floor(seconds/60)).padStart(2,'0')}:{String(seconds%60).padStart(2,'0')}</strong></div><select aria-label="Session duration" disabled={!!deadline} value={minutes} onChange={e=>{setMinutes(+e.target.value);setSeconds(+e.target.value*60);}}>{[15,25,30,45,60].map(m=><option key={m} value={m}>{m} min</option>)}</select><button onClick={()=>deadline?setDeadline(null):setDeadline(Date.now()+seconds*1000)} disabled={seconds===0}>{deadline?'Pause':'Start'}</button><button aria-label="Reset timer" onClick={()=>{setDeadline(null);setSeconds(minutes*60);}}>↻</button></div>{seconds===0&&<p role="status">Time’s up! Reset and start the timer to run or submit again.</p>}
-    <div className="editor-head"><span>solution.py</span><span>Python 3</span><button disabled={busy||!p} onClick={()=>{if(window.confirm('Reset this draft to starter code?'))setDrafts({...drafts,[p.id]:p.starter});}}>Reset code</button></div>
-    {p&&<CodeMirror aria-label="Python code editor" value={drafts[p.id]??p.starter} height="330px" theme="dark" extensions={[python()]} editable={!busy} onChange={value=>setDrafts(prev=>({...prev,[p.id]:value}))}/>}
-    <p id="execution-hint" className="execution-hint" role="status">{timerRunning?"Timer running — you can run examples and submit.":seconds===0?"Reset and start the timer to unlock testing.":"Start or resume the timer to run examples or submit."}</p><div className="actions"><span>{p?.result_mode==='mutated_first_arg'?'Modify nums in place':'Return values · no input() needed'}</span><button disabled={busy||!p||!timerRunning} aria-describedby="execution-hint" onClick={()=>run('run')}>▷ Run examples</button><button className="primary" disabled={busy||!p||!timerRunning} aria-describedby="execution-hint" onClick={()=>run('submit')}>{busy?'Testing…':'Submit solution →'}</button></div>
-    <div className="results" aria-live="polite"><div className="section-label">TEST RESULTS</div>{!result?<p>{busy?'Running your solution…':'Run the examples to check your approach. Submit to test every case.'}</p>:<><h3 className={result.accepted?'success':'failure'}>{result.accepted?(result.mode==='submit'?'Accepted — well played!':'Examples passed — ready to submit?'):'Keep going — some cases failed'}</h3>{result.results.map(r=><details key={r.case}><summary>{r.passed?'✓':'✕'} Case {r.case} {!r.args?'· Hidden':''}<span>{r.elapsed_ms} ms</span></summary>{r.args&&<pre>Input: {JSON.stringify(r.args)}{'\n'}Expected: {JSON.stringify(r.expected)}{'\n'}Actual: {JSON.stringify(r.actual)}</pre>}{r.error&&<pre>{r.error}</pre>}</details>)}</>}</div></section></div><footer>DSA ARENA <span>Practice with purpose.</span></footer></main></>;
+ }
+ const running=canRun(course,now),seconds=course?.status==='running'?remaining(course.deadline,now):course?.status==='solved'?(course.finishedSeconds??0):(p?.minutes||20)*60;
+ function advance(){setResult(null);setError('');send({type:'next'});setNow(Date.now());}
+ const courseComplete=course?.status==='complete';
+ return <><header><a className="brand" href="/">◈ <span>DSA<span className="accent">Arena</span></span></a><span className="tag">DAILY PYTHON DSA PRACTICE</span><span className="local">● Local workspace</span></header>
+ <main><section className="intro"><div><span className="eyebrow">YOUR LEARNING PATH</span><h1>Build understanding. Earn your next chapter.</h1><p>One question. One timer. Five concepts mastered before you move on.</p></div></section>
+ {course&&<ProgressDashboard course={course} chapters={chapters} problems={problems}/>}
+ {saveError&&<div role="alert" className="error">Browser storage is unavailable. Keep this tab open; your timer and progress may not survive reload.</div>}
+ {error&&<div role="alert" className="error">{error}</div>}
+ {course?.notice&&<div role="status" className="course-notice">{course.notice}</div>}
+ {courseComplete?<section className="completion"><span className="eyebrow">PATH COMPLETE</span><h2>Three chapters. Fifteen concepts. Well earned.</h2><p>You solved five questions in each chapter. Your chapter badges and activity history are saved in this browser.</p></section>:
+ <div className="workspace"><aside><div className="section-label">CHAPTER PATH</div><div className="chapter-path">{chapters.map((c,i)=>{const count=(course?.earned[c.id]||[]).length;return <div key={c.id} className={i===course?.chapterIndex?'chapter-current':''}><span>{count===5?'✓':i>course?.chapterIndex?'🔒':i+1}</span><div><strong>{c.title}</strong><small>{count} / 5 solved · 10 in pool</small></div></div>;})}</div>
+ <div className="section-label pool-label">CURRENT CHAPTER POOL</div><nav aria-label="Chapter question pool">{problems.filter(q=>q.chapter_id===chapter?.id).map((q,i)=>{const active=q.id===p?.id,solved=(course?.earned[chapter.id]||[]).includes(q.id);return <button key={q.id} className={'problem '+(active?'active':'')} disabled={!active} aria-current={active?'step':undefined}><span className="number">{solved?'✓':active?'→':'🔒'}</span><span><strong>{q.title}</strong><small>{q.difficulty} · {q.minutes} min{active?' · Current':''}</small></span></button>;})}</nav>
+ <div className="aside-note">Five rounds, ten questions.<p>Solve one question from each concept pair. A timeout swaps to the other question in that pair. Question navigation stays locked.</p></div></aside>
+ <article>{p&&chapter?<><div className="problem-head"><span className="pill">{p.difficulty} · {p.minutes} min</span><span>Concept {course.roundIndex+1} / 5</span></div><div className="chapter-lesson-link"><ChapterLesson chapter={chapter}/></div><h2 className="question-title">{p.title}</h2><p className="concept-label">{chapter.concepts[course.roundIndex].title}</p><p className="description">{p.description}</p>
+ <h3>Constraints & approach</h3><ul className="guidance">{p.constraints.map(t=><li key={t}>{t}</li>)}</ul><h3>Examples</h3><div className="examples">{p.examples.map((c,i)=><div key={i}><small>EXAMPLE {i+1}</small><pre>Input: {JSON.stringify(c.args)}{'\n'}Output: {JSON.stringify(c.expected)}</pre></div>)}</div>
+ <section className="hints"><h3>Need a nudge?</h3><p>Reveal a little at a time. Hints don’t reduce your score.</p>{p.hints.slice(0,course.hints).map((hint,i)=><div className="hint" key={hint}><small>HINT {i+1}</small><p>{hint}</p></div>)}<button disabled={course.hints>=p.hints.length||course.status==='solved'} onClick={()=>send({type:'hint'})}>{course.hints>=p.hints.length?'All hints revealed':`Reveal hint ${course.hints+1} of ${p.hints.length}`}</button></section>
+ <div className="contract"><strong>Your function: <code>{p.function_name}</code></strong><p>{p.result_mode==='mutated_first_arg'?'Modify the original list; the runner ignores the return value.':'Return your answer; arguments follow the order in the examples.'} {p.test_count} cases check your submission.</p><strong>Before submitting, explain</strong><ul>{p.prompts.map(t=><li key={t}>{t}</li>)}</ul><p>Tests check output behavior. Complexity and method restrictions are self-review requirements.</p></div></>:<p>Loading your learning path…</p>}</article>
+ <section className="coding"><div className="timer"><div><small>THIS QUESTION ONLY · {p?.minutes||'—'} MIN LIMIT</small><strong role="timer" aria-label="Time remaining">{String(Math.floor(seconds/60)).padStart(2,'0')}:{String(seconds%60).padStart(2,'0')}</strong></div>{course?.status==='ready'?<button className="primary" disabled={!p} onClick={()=>{setNow(Date.now());send({type:'start'});}}>Start question</button>:<span className="timer-state">{course?.status==='solved'?'✓ Completed':'● Timer running'}</span>}</div>
+ <p className="execution-hint" role="status">{course?.status==='solved'?'Solved in time. Continue to your next concept.':running?'Testing is unlocked. The timer continues while you read, edit, or reload.':'Start this question’s timer to run examples or submit. You cannot skip it.'}</p>
+ {course?.status==='solved'&&<div className="next-question"><button className="primary" onClick={advance}>{course.roundIndex<4?'Next concept →':course.chapterIndex<chapters.length-1?`Unlock ${chapters[course.chapterIndex+1].title} →`:'Finish learning path →'}</button><p>{(course.earned[chapter.id]||[]).length} / 5 successful questions in this chapter</p></div>}
+ <div className="editor-head"><span>solution.py</span><span>Python 3</span></div>{p&&<CodeMirror key={p.id} aria-label="Python code editor" value={drafts[p.id]??p.starter} height="330px" theme="dark" extensions={[python()]} editable={!busy&&course.status!=='solved'} onChange={value=>setDrafts(prev=>({...prev,[p.id]:value}))}/>}
+ <div className="actions"><span>{p?.result_mode==='mutated_first_arg'?'Modify the original list':'Return a value'}</span><button disabled={busy||!running} onClick={()=>run('run')}>▷ Run examples</button><button className="primary" disabled={busy||!running} onClick={()=>run('submit')}>{busy?'Testing…':'Submit solution →'}</button></div>
+ <div className="results" aria-live="polite"><div className="section-label">TEST RESULTS</div>{!result?<p>{busy?'Running your solution…':'Examples are practice. Only an accepted full submission completes a question.'}</p>:<><h3 className={result.accepted?'success':'failure'}>{result.accepted?(result.mode==='submit'?'Accepted — concept mastered!':'Examples passed — submit to complete this question.'):'Keep going — some cases failed'}</h3>{result.results.map(r=><details key={r.case}><summary>{r.passed?'✓':'✕'} Case {r.case} {!r.args?'· Hidden':''}<span>{r.elapsed_ms} ms</span></summary>{r.args&&<pre>Input: {JSON.stringify(r.args)}{'\n'}Expected: {JSON.stringify(r.expected)}{'\n'}Actual: {JSON.stringify(r.actual)}</pre>}{r.error&&<pre>{r.error}</pre>}</details>)}</>}</div>
+ </section></div>}<footer>DSA ARENA <span>Understand the concept. Earn the next step.</span></footer></main></>;
 }
-

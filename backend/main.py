@@ -6,7 +6,7 @@ import tempfile
 import time
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
-from backend.problems import PROBLEMS, BY_ID
+from backend.problems import PROBLEMS, BY_ID, CHAPTERS
 
 app = FastAPI(title='DSA Arena', version='1.0.0')
 slots = asyncio.Semaphore(2)
@@ -20,6 +20,10 @@ class Submission(BaseModel):
 @app.get('/api/health')
 def health():
     return {'status': 'ok'}
+
+@app.get('/api/chapters')
+def chapters():
+    return CHAPTERS
 
 @app.get('/api/problems')
 def problems():

@@ -1,19 +1,25 @@
 # DSA Arena
 
-A Python interview practice MVP with a React + CodeMirror editor and FastAPI runner.
+A Python practice app with a React + CodeMirror editor, FastAPI runner, and a guided chapter path.
 
-## Features
+## Learning path
 
-- Your Daily Python DSA Practice questions: Move Zeroes (in-place practice), Day 2: First Duplicate Within K Positions, and Day 3: First Non-Repeating Character. Original function names, day labels, constraints, examples, and reflection prompts are included.
-- Python syntax highlighting, autocomplete, line numbers, indentation, saved drafts, and reset to starter code.
-- **Run examples** checks the visible examples for that question; **Submit solution** runs the full suite, including hidden edge cases. Results show pass/fail, execution time, visible input/output, and errors.
-- 15/25/30/45/60-minute countdown with start, pause, reset, and expiry notice. Uses elapsed wall time so background tabs do not slow the countdown. Run Examples and Submit are enabled only while the timer is running; pause, reset, and expiry lock both actions. Editing remains available. timer state resets on page reload.
-- Browser-local progress dashboard, submission count, permanent solved status, and drafts. No account required. Clearing browser storage removes this data; no server-side progress or cross-device sync in this MVP.
-- Responsive layout, keyboard-accessible controls, and live execution feedback.
+- **Three chapters:** Arrays & In-place, Hash Maps & Sets, and Strings & Patterns.
+- **Ten questions per chapter:** five concepts, with two questions per concept. Solve one from each pair: **five accepted questions unlock the next chapter**. You do not need to solve all ten.
+- **One question at a time:** other questions and later chapters stay locked, even before starting. After an accepted full submission, choose **Next concept**, or unlock the next chapter after your fifth solve.
+- **Fixed difficulty-based timers:** Easy questions get 20 or 25 minutes, Medium questions 30 or 35, and Hard questions 45. Start explicitly; Run Examples and Submit only work during that question's active time. There is no pause, time selector, reset, or skip.
+- **Timeout retries:** when time expires, a notice appears and the other question in that concept pair is posed. Start a new timer when ready. Repeated timeouts alternate the pair; your completed concepts stay credited. Each replacement has its own saved draft and three hints.
+- **Reload-safe deadlines:** the current question, deadline, hints, and progress save to browser storage. Time continues across reloads, closed tabs, and background tabs. If the deadline passed while away, the replacement question appears on return.
+- **Acceptance boundary:** only a full accepted submission received before the deadline completes a question. Passing examples does not count. A late or stale response never credits the replacement question.
+- **Chapter field guides:** descriptions, illustrated walkthroughs, Python methods, operation costs, code examples, and real uses. Includes list mutation vs copying, dictionary/set membership, and immutable string transformations.
+- **Progressive hints:** reveal three nudges per question; hints have no score penalty.
+- **Actual progress:** solved counts by difficulty, earned chapter badges, a 26-week submission activity grid, active days, and streaks. No placeholder activity or social statistics.
+
+Drafts and progression are local to this browser, not an account. Clearing browser storage clears them; there is no cross-device sync. The chapter path uses `arena.course.v1`. Drafts from the earlier MVP remain under `arena.drafts`; older `arena.progress` records remain untouched but do not grant chapter credit. Course credit starts with the new guided path.
 
 ## Local setup
 
-Requirements: macOS or Linux, Python 3.9+, Node.js 22.12+ (or 24+), npm. Windows users should use WSL (the runner uses POSIX process/resource limits).
+Requirements: macOS or Linux, Python 3.9+, Node.js 22.12+ (or 24+), npm. Windows users should use WSL because the runner uses POSIX process/resource limits.
 
 ```sh
 git clone https://github.com/njugunanduati/dsa-arena.git
@@ -32,13 +38,16 @@ npm ci
 npm run dev
 ```
 
-Open **http://127.0.0.1:5173**. Vite proxies `/api` requests to port 8000; start both servers. API docs: **http://127.0.0.1:8000/docs**. Stop either server with Ctrl+C.
+Open **http://127.0.0.1:5173**. Vite proxies `/api` to port 8000, so both servers must run. API docs: **http://127.0.0.1:8000/docs**. Stop with Ctrl+C.
 
 ## Practice workflow
 
-1. Choose a problem and implement the provided named function (`move_zeroes`, `nearby_duplicate`, or `first_unique_char`). Inputs are JSON values, passed as positional arguments; return a JSON-serializable value instead of reading stdin or printing an answer. For Move Zeroes, mutate the original list; the runner checks that list and ignores the return value.
-2. Run examples for quick feedback. Submit for full evaluation; only submissions update progress. Hidden case details are omitted from API results.
-3. Start the interview timer before running examples or submitting. Pause locks testing until you resume. Click the topic label for a short concept explanation and visual example. Drafts save as you type. A later failed submission never removes an earlier solve.
+1. Read the current chapter's field guide and the assigned question. Reveal a hint if you need one.
+2. Implement the provided named function. JSON inputs are passed as positional arguments. Return a JSON-serializable value. For mutation questions, change the original list; the return value is ignored.
+3. Start the question's timer. Run Examples checks visible cases; Submit runs the full suite, including hidden cases. Test output shows pass/fail, visible inputs/results, execution time, and errors.
+4. On acceptance, continue to the next concept. On timeout, try the alternate question on the same concept. Five successful concepts earn the chapter badge and unlock the next chapter.
+
+Timers and navigation are enforced by the browser workflow, not a server-side proctoring system. The local API remains a direct evaluation endpoint. Complexity targets and method restrictions are learning requirements; output tests verify behavior, not asymptotic complexity or which Python methods you used.
 
 ## Tests
 
@@ -53,26 +62,28 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-Browser tests start both servers automatically. They use dedicated ports 18000 and 15173; ensure these ports are free. They cover editing and execution, accepted/failed submissions, persistence, problem switching, search, timer controls and expiry, and mobile layout. Backend tests verify every reference solution, validation, errors, timeouts, and recovery. Reference solutions are test fixtures only.
+Browser tests start both servers on ports 18000 and 15173. Override with `DSA_E2E_API_PORT` and `DSA_E2E_WEB_PORT` if those ports are busy. The suite covers execution, single-question locking, reload-safe deadlines, same-concept timeout replacement, hints, the field guide, and mobile layout. Frontend tests also cover five-solve unlocks, all-chapter completion, duplicate-credit prevention, malformed saved state, and late response rejection. Backend tests evaluate all 30 reference solutions and check input validation, hidden-case privacy, errors, resource timeouts, and recovery. Solutions exist only in test fixtures and are never returned by the catalog API.
 
 ## Execution model and limits
 
-**Trusted local use only. Never expose this API to the internet or execute code supplied by other people.** The API runs arbitrary Python with the privileges of your user. Disposable subprocesses, isolated Python startup, a temporary working directory, output suppression, two-second CPU and three-second wall limits per case, and process-group cleanup provide reliability, not a security sandbox. Code can still access files, network, or create processes; there is no authentication or OS isolation. Two submissions execute at once per API process; submissions run cases sequentially. Source is limited to 20,000 characters. Timings include process startup and are not algorithm benchmarks. The test suite verifies outputs, not asymptotic complexity.
+**Trusted local use only. Never expose this API to the internet or execute code supplied by other people.** Python executes with your user privileges. Disposable processes, isolated Python startup, temporary working directories, print suppression, two-second CPU and three-second wall limits per case, and process-group cleanup improve reliability; they are not a security sandbox. Code can still access files, network, or spawn processes. Two submissions execute concurrently per API process, with sequential cases per submission. Source is capped at 20,000 characters. Timings include process startup.
 
-For public hosting, replace the worker with a hardened execution service using per-job containers/VMs, no network, restricted filesystem, memory/process quotas, admission limits, and authentication before deployment. This repository intentionally does not publish a public runner.
+For public hosting, replace the worker with a hardened execution service using per-job containers/VMs, no network, restricted filesystems, memory/process quotas, admission limits, and authentication. This app intentionally does not publish a public runner.
 
 ## Project layout
 
-- `frontend/src/App.jsx`: practice interface and workflow
-- `frontend/src/TopicGuide.jsx`: accessible concept popup with SVG examples
-- `frontend/src/storage.js`: browser progress, drafts, timer arithmetic
-- `backend/main.py`: catalog and submission endpoints
+- `frontend/src/App.jsx`: guided practice interface and request handling
+- `frontend/src/course.js`: persisted chapter state, deadlines, unlocks, activity calculations
+- `frontend/src/ChapterLesson.jsx`: illustrated chapter lessons and method references
+- `frontend/src/ProgressDashboard.jsx`: actual activity and chapter badges
+- `backend/problems.py`: 30-question curriculum, retry pairs, public/hidden cases, and hints
+- `backend/daily_problems.py`: preserved original daily-practice source material
+- `backend/main.py`: chapters, problem catalog, and submission API
 - `backend/worker.py`: disposable local Python executor
-- `backend/problems.py`: problem statements, starters, public and hidden cases
-- `backend/tests`, `frontend/src/*.test.js`, `frontend/e2e`: automated checks
+- `backend/tests/solutions.py`: reference solutions used only by tests
 
-Add a challenge in `backend/problems.py` with a unique ID, function name, starter signature, example count, guidance, and cases (visible examples first, followed by hidden cases). Add a reference solution to the backend test fixtures.
+Each chapter must contain exactly five concepts and each concept exactly two questions. The state machine and catalog tests enforce this curriculum contract. Add a reference solution for every new question.
 
 ## Curriculum source
 
-This catalog follows the **Daily Python DSA Practice** chat. Day 2 and Day 3 retain the retrieved statements, examples, constraints, 25-minute recommendations, and self-review prompts. Move Zeroes was reconstructed from the shared attempt and in-place follow-up; its extra examples and 30-minute default are Arena additions, not a verbatim recovered assignment. Added hidden cases cover empty input, duplicates, negative numbers, and boundary behavior. Approach restrictions and complexity targets are learning requirements; output tests do not prove them. No other earlier in-place follow-up questions were available in the readable chat history, so none have been invented.
+Move Zeroes, First Duplicate Within K Positions, and First Non-Repeating Character come from **Daily Python DSA Practice**. The two later assignments retain their original signatures, source examples, constraints, and prompts. The other 27 questions, paired retries, hints, lessons, and difficulty allocations are new Arena curriculum additions requested for the chapter flow, not recovered chat assignments. The screenshot inspired progress counts, earned badges, and activity history; all displayed values come from actual local chapter attempts.

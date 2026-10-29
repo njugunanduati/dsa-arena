@@ -5,3 +5,6 @@ it('persists drafts across reads',()=>{write('drafts',{'two-sum':'def solve(): p
 it('recovers from malformed or unexpected storage',()=>{localStorage.setItem('drafts','bad');expect(read('drafts',{})).toEqual({});localStorage.setItem('drafts','[]');expect(read('drafts',{})).toEqual({});});
 it('counts submissions and preserves a previous solve',()=>{let p=record({},'two-sum',false);expect(p['two-sum'].solved).toBe(false);p=record(p,'two-sum',true);p=record(p,'two-sum',false);expect(p['two-sum']).toMatchObject({attempts:3,solved:true});});
 it('uses wall time and clamps countdown at zero',()=>{expect(remaining(60000,1000)).toBe(59);expect(remaining(60000,59999)).toBe(1);expect(remaining(60000,90000)).toBe(0);});
+
+import {canExecute} from './storage';
+it('allows execution only while a started timer is running',()=>{expect(canExecute(null,1000)).toBe(false);expect(canExecute(2000,1000)).toBe(true);expect(canExecute(1000,1000)).toBe(false);expect(canExecute(999,1000)).toBe(false);});

@@ -7,7 +7,7 @@ A Python interview practice MVP with a React + CodeMirror editor and FastAPI run
 - Your Daily Python DSA Practice questions: Move Zeroes (in-place practice), Day 2: First Duplicate Within K Positions, and Day 3: First Non-Repeating Character. Original function names, day labels, constraints, examples, and reflection prompts are included.
 - Python syntax highlighting, autocomplete, line numbers, indentation, saved drafts, and reset to starter code.
 - **Run examples** checks the visible examples for that question; **Submit solution** runs the full suite, including hidden edge cases. Results show pass/fail, execution time, visible input/output, and errors.
-- 15/25/30/45/60-minute countdown with start, pause, reset, and expiry notice. Uses elapsed wall time so background tabs do not slow the countdown. Expiry allows continued practice; timer state resets on page reload.
+- 15/25/30/45/60-minute countdown with start, pause, reset, and expiry notice. Uses elapsed wall time so background tabs do not slow the countdown. Run Examples and Submit are enabled only while the timer is running; pause, reset, and expiry lock both actions. Editing remains available. timer state resets on page reload.
 - Browser-local progress dashboard, submission count, permanent solved status, and drafts. No account required. Clearing browser storage removes this data; no server-side progress or cross-device sync in this MVP.
 - Responsive layout, keyboard-accessible controls, and live execution feedback.
 
@@ -38,7 +38,7 @@ Open **http://127.0.0.1:5173**. Vite proxies `/api` requests to port 8000; start
 
 1. Choose a problem and implement the provided named function (`move_zeroes`, `nearby_duplicate`, or `first_unique_char`). Inputs are JSON values, passed as positional arguments; return a JSON-serializable value instead of reading stdin or printing an answer. For Move Zeroes, mutate the original list; the runner checks that list and ignores the return value.
 2. Run examples for quick feedback. Submit for full evaluation; only submissions update progress. Hidden case details are omitted from API results.
-3. Start an optional interview timer. Drafts save as you type. A later failed submission never removes an earlier solve.
+3. Start the interview timer before running examples or submitting. Pause locks testing until you resume. Click the topic label for a short concept explanation and visual example. Drafts save as you type. A later failed submission never removes an earlier solve.
 
 ## Tests
 
@@ -63,7 +63,8 @@ For public hosting, replace the worker with a hardened execution service using p
 
 ## Project layout
 
-- `frontend/src/main.jsx`: practice interface and workflow
+- `frontend/src/App.jsx`: practice interface and workflow
+- `frontend/src/TopicGuide.jsx`: accessible concept popup with SVG examples
 - `frontend/src/storage.js`: browser progress, drafts, timer arithmetic
 - `backend/main.py`: catalog and submission endpoints
 - `backend/worker.py`: disposable local Python executor

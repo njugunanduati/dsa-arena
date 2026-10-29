@@ -1,0 +1,56 @@
+import React, {act} from 'react';
+import {createRoot} from 'react-dom/client';
+import {afterEach,beforeEach,expect,it,vi} from 'vitest';
+import App from './App';
+vi.mock('@uiw/react-codemirror',()=>({default:()=> <div>Python editor</div>}));
+const problem={id:'move-zeroes',title:'Move Zeroes',topic:'Arrays · In-place',day:'In-place practice',difficulty:'Easy–Medium',starter:'def move_zeroes(nums): pass',function_name:'move_zeroes',result_mode:'mutated_first_arg',description:'Move zeroes.',constraints:[],prompts:[],examples:[],test_count:7,minutes:30};
+let host,root;
+const button=name=>[...host.querySelectorAll('button')].find(el=>el.textContent.includes(name));
+beforeEach(async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ vi.useFakeTimers();vi.setSystemTime(new Date('2026-10-28T12:00:00Z'));
+ localStorage.clear();
+ vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:true,json:async()=>[problem]}));
+ HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','');};
+ HTMLDialogElement.prototype.close=function(){this.removeAttribute('open');};
+ host=document.createElement('div');document.body.append(host);root=createRoot(host);
+ await act(async()=>root.render(<App/>));
+});
+afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.useRealTimers();vi.unstubAllGlobals();});
+it('locks execution before start, on pause/reset, and on expiry',async()=>{
+ const run=button('Run examples'),submit=button('Submit solution');
+ expect(run.disabled).toBe(true);expect(submit.disabled).toBe(true);
+ await act(async()=>{run.click();submit.click();});
+ expect(fetch).toHaveBeenCalledTimes(1);
+ await act(async()=>button('Start').click());
+ expect(run.disabled).toBe(false);expect(submit.disabled).toBe(false);
+ await act(async()=>button('Pause').click());
+ expect(run.disabled).toBe(true);expect(submit.disabled).toBe(true);
+ await act(async()=>button('Start').click());
+ expect(run.disabled).toBe(false);
+ await act(async()=>host.querySelector('[aria-label="Reset timer"]').click());
+ expect(run.disabled).toBe(true);
+ await act(async()=>button('Start').click());
+ await act(async()=>vi.advanceTimersByTime(1800000));
+ expect(run.disabled).toBe(true);expect(submit.disabled).toBe(true);
+ expect(host.textContent).toContain('Time’s up!');
+});
+it('runs only after start and records successful submission',async()=>{
+ fetch.mockResolvedValueOnce({ok:true,json:async()=>({accepted:true,mode:'submit',results:[]})});
+ await act(async()=>button('Start').click());
+ await act(async()=>button('Submit solution').click());
+ expect(fetch).toHaveBeenCalledTimes(2);
+ expect(JSON.parse(fetch.mock.calls[1][1].body).problem_id).toBe('move-zeroes');
+ expect(host.textContent).toContain('Accepted — well played!');
+});
+it('opens a brief concept guide with an accessible visual and close control',async()=>{
+ const trigger=host.querySelector('[aria-haspopup="dialog"]');
+ await act(async()=>trigger.click());
+ const dialog=host.querySelector('dialog');
+ expect(dialog.hasAttribute('open')).toBe(true);
+ expect(dialog.textContent).toContain('Arrays & in-place changes');
+ expect(dialog.textContent).toContain('O(1)');
+ expect(dialog.querySelector('svg[role="img"]').getAttribute('aria-label')).toContain('same list');
+ await act(async()=>dialog.querySelector('[aria-label="Close topic explanation"]').click());
+ expect(dialog.hasAttribute('open')).toBe(false);
+});

@@ -4,6 +4,9 @@ async function edit(page,code){const editor=page.locator('.cm-content');await ed
 test('solve workflow, drafts, progress, failures and navigation',async({page})=>{
  await page.goto('/');
  await expect(page.getByRole('heading',{name:'Move Zeroes',exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Run examples'})).toBeDisabled();
+ await expect(page.getByRole('button',{name:'Submit solution'})).toBeDisabled();
+ await page.getByRole('button',{name:'Start',exact:true}).click();
  await edit(page,solution);
  await page.getByRole('button',{name:'Run examples'}).click();
  await expect(page.getByText('Examples passed — ready to submit?')).toBeVisible();
@@ -14,11 +17,14 @@ test('solve workflow, drafts, progress, failures and navigation',async({page})=>
  await page.reload();
  await expect(page.locator('.cm-content')).toContainText('write += 1');
  await expect(page.getByText('1 submissions')).toBeVisible();
+ await page.getByRole('button',{name:'Start',exact:true}).click();
  await edit(page,'def move_zeroes(nums):\n    return []');
  await page.getByRole('button',{name:'Submit solution'}).click();
  await expect(page.getByText('Keep going — some cases failed')).toBeVisible();
  await expect(page.getByText('2 submissions')).toBeVisible();
  await expect(page.locator('.score strong')).toHaveText('1 / 3');
+ await page.getByRole('button',{name:'Pause',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Submit solution'})).toBeDisabled();
  await page.getByRole('button',{name:/First Non-Repeating Character/}).click();
  await expect(page.getByRole('timer')).toHaveText('25:00');
  await expect(page.locator('.cm-content')).toContainText('def first_unique_char(s: str)');
@@ -43,10 +49,25 @@ test('timer pauses, resets and expires using wall time',async({page})=>{
  await page.getByRole('button',{name:'Start',exact:true}).click();
  await page.clock.fastForward(900000);
  await expect(page.getByRole('timer')).toHaveText('00:00');
- await expect(page.getByRole('status')).toContainText('Time’s up!');
+ await expect(page.getByText('Time’s up!',{exact:false})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Run examples'})).toBeDisabled();
+ await expect(page.getByRole('button',{name:'Submit solution'})).toBeDisabled();
 });
 test('mobile layout fits viewport',async({page})=>{
  await page.setViewportSize({width:390,height:844});await page.goto('/');
  await expect(page.getByRole('heading',{name:'Move Zeroes',exact:true})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+});
+
+test('topic popup explains the category with a visual and closes with Escape',async({page})=>{
+ await page.goto('/');
+ const trigger=page.getByRole('button',{name:'Learn about Arrays · In-place'});
+ await trigger.click();
+ const dialog=page.getByRole('dialog');
+ await expect(dialog).toBeVisible();
+ await expect(dialog.getByRole('heading',{name:'Arrays & in-place changes'})).toBeVisible();
+ await expect(dialog.getByRole('img')).toBeVisible();
+ await page.keyboard.press('Escape');
+ await expect(dialog).not.toBeVisible();
+ await expect(trigger).toBeFocused();
 });

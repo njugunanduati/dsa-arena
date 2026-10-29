@@ -7,3 +7,5 @@ export function record(progress, id, accepted) {
   const old = progress[id] || {};
   return {...progress, [id]:{attempts:(old.attempts || 0)+1, solved:!!old.solved || accepted, lastAttempt:new Date().toISOString()}};
 }
+
+export function canExecute(deadline, now = Date.now()) { return Number.isFinite(deadline) && deadline > now; }
